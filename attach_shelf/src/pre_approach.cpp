@@ -8,6 +8,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/subscription_options.hpp"
 #include "rclcpp/utilities.hpp"
+#include <cmath>
 #include <geometry_msgs/msg/twist.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <nav_msgs/msg/odometry.hpp>
@@ -25,8 +26,6 @@ class PreApproach : public rclcpp::Node
     public:
         PreApproach():Node("pre_approach_node")
         {
-
-            RCLCPP_INFO(this->get_logger(), "pre_approach node has started!...");
             //defining parameters
             this->declare_parameter("obstacle", 0.0);
             this->declare_parameter("degrees", 0);
@@ -52,8 +51,8 @@ class PreApproach : public rclcpp::Node
             publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/robot/cmd_vel", 10);
             scan_subscription_ = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10, std::bind(&PreApproach::scan_callback, this, _1), odom_options);
             odom_subscription_ = this->create_subscription<nav_msgs::msg::Odometry>("/odom", 10, std::bind(&PreApproach::odom_callback, this, _1), scan_options);
-            
-            RCLCPP_INFO(this->get_logger(), "cmd_vel publisher intialised!...");
+           
+            RCLCPP_INFO(this->get_logger(), "pre_approach node has started!...");
         }
 
     private:
@@ -67,19 +66,13 @@ class PreApproach : public rclcpp::Node
 
         void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
         {
-            RCLCPP_INFO(this->get_logger(), "inside odom callback method");
             tf2::Quaternion quat;
             tf2::fromMsg(msg->pose.pose.orientation, quat);
 
             double roll, pitch, yaw;
             tf2::Matrix3x3(quat).getRPY(roll, pitch, yaw);
 
-            RCLCPP_INFO(this->get_logger(), "Yaw: [%f]", yaw);
-
-            if (dest_reached && !rotate_status)
-            {
-                rotate_robot();
-            }
+            current_yaw_angle = yaw; 
         }
 
 
@@ -92,7 +85,6 @@ class PreApproach : public rclcpp::Node
     
             if (front_laser_reading > obstacle_distance_parameter  && !dest_reached)
             {
-               RCLCPP_INFO(this->get_logger(), "front_laser_reading: %f", front_laser_reading);
                vel_msg.linear.x = translation_speed;
             }
             else
@@ -102,6 +94,11 @@ class PreApproach : public rclcpp::Node
             }
             
             publisher_->publish(vel_msg);
+
+            if (dest_reached && !rotate_status)
+            {
+                rotate_robot();
+            }
         }
 
 
@@ -109,9 +106,39 @@ class PreApproach : public rclcpp::Node
 
         void rotate_robot()
         {
-            RCLCPP_INFO(this->get_logger(), "inside rotate method");
+            //setting the velocities for rotation
+            vel_msg.linear.x = 0;
+            if (angle_to_be_rotated_parameter > 0)
+            {
+                vel_msg.angular.z = angular_speed;
+            }
+            else if( angle_to_be_rotated_parameter < 0)
+            {
+                vel_msg.angular.z = -1 * angular_speed;
+            }
+            else
+            {
+                rotate_status = true;
+                return;
+            }
 
-            //write the rotation algorithm here
+
+            RCLCPP_INFO(this->get_logger(), "Rotation started...");
+            rclcpp::Rate loop_rate(100);
+            float target_angle = current_yaw_angle + angle_to_be_rotated_parameter;
+
+            while (fabs(target_angle - current_yaw_angle) > yaw_threshold)
+            {
+                publisher_->publish(vel_msg);
+                loop_rate.sleep();
+            }
+
+            //stopping the robot after rotation
+            vel_msg.linear.x = 0.0;
+            vel_msg.angular.z = 0;
+            publisher_->publish(vel_msg);
+            rotate_status = true;
+            RCLCPP_INFO(this->get_logger(), "Rotation of %0.2f degrees successfully done...", (angle_to_be_rotated_parameter * 180/M_PI));
         }
 
 
@@ -130,12 +157,13 @@ class PreApproach : public rclcpp::Node
         int front_laser_array_index;
         float front_laser_reading;
         float obstacle_distance_parameter;
-        int angle_to_be_rotated_parameter;
+        float angle_to_be_rotated_parameter;
         bool dest_reached;
         bool rotate_status;
         float angular_speed = 0.3;
         float translation_speed = 0.6;
-        float yaw_angle;
+        float current_yaw_angle;
+        float yaw_threshold= 0.02;
 };
 
 

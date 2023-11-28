@@ -27,11 +27,16 @@ class PreApproach : public rclcpp::Node
         PreApproach():Node("pre_approach_node")
         {
             //defining parameters
-            this->declare_parameter("obstacle", 0.0);
-            this->declare_parameter("degrees", 0);
+            auto obstacle_param_desc = rcl_interfaces::msg::ParameterDescriptor{};
+            obstacle_param_desc.description = "sets the obstacle distance or gap at which the robot will stop.";
+            this->declare_parameter<float>("obstacle", 0.0, obstacle_param_desc);
+
+            auto degrees_param_desc = rcl_interfaces::msg::ParameterDescriptor{};
+            degrees_param_desc.description = "the degree to be rotated by the robot.";
+            this->declare_parameter<int>("degrees", 0, degrees_param_desc);
 
             //intialising the variables
-            getting_params();
+            this->getting_params();
             dest_reached = false;
             rotate_status = false;
 
@@ -58,8 +63,9 @@ class PreApproach : public rclcpp::Node
     private:
         void getting_params()
         {
-            obstacle_distance_parameter = this->get_parameter("obstacle").get_parameter_value().get<float>();
-            angle_to_be_rotated_parameter = (this->get_parameter("degrees").get_parameter_value().get<int>()) *  (M_PI / 180.0);
+            this->get_parameter("obstacle", obstacle_distance_parameter);
+            this->get_parameter("degrees", angle_to_be_rotated_parameter);
+            RCLCPP_INFO(this->get_logger(), "obstacle: %f", obstacle_distance_parameter);
         }
 
 
@@ -106,6 +112,8 @@ class PreApproach : public rclcpp::Node
 
         void rotate_robot()
         {
+            rotate_angle_radians = angle_to_be_rotated_parameter * M_PI/180;
+
             //setting the velocities for rotation
             vel_msg.linear.x = 0;
             if (angle_to_be_rotated_parameter > 0)
@@ -125,7 +133,7 @@ class PreApproach : public rclcpp::Node
 
             RCLCPP_INFO(this->get_logger(), "Rotation started...");
             rclcpp::Rate loop_rate(100);
-            float target_angle = current_yaw_angle + angle_to_be_rotated_parameter;
+            float target_angle = current_yaw_angle + rotate_angle_radians;
 
             while (fabs(target_angle - current_yaw_angle) > yaw_threshold)
             {
@@ -157,7 +165,8 @@ class PreApproach : public rclcpp::Node
         int front_laser_array_index;
         float front_laser_reading;
         float obstacle_distance_parameter;
-        float angle_to_be_rotated_parameter;
+        int angle_to_be_rotated_parameter;
+        float rotate_angle_radians;
         bool dest_reached;
         bool rotate_status;
         float angular_speed = 0.3;

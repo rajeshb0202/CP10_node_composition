@@ -32,56 +32,92 @@ private:
 
 
 
-void detect_table_legs()
-{
-    std::vector<int> table_legs_indexes;
-    int start_angle_index = 0, end_angle_index = 0;
-    bool leg_detection_going_on = false;
-    number_table_legs_detected = 0;
-
-    for (size_t i = 0; i < (scan_msg_ -> intensities.size()) - 2; i++)
+    void detect_table_legs()
     {
-        if (scan_msg_ -> intensities[i] >= intensity_threshold)
+        std::vector<int> table_legs_indexes;
+        int start_angle_index = 0, end_angle_index = 0;
+        bool leg_detection_going_on = false;
+        number_table_legs_detected = 0;
+
+        for (size_t i = 0; i < (scan_msg_ -> intensities.size()) - 2; i++)
         {
-            if (!leg_detection_going_on)
+            if (scan_msg_ -> intensities[i] >= intensity_threshold)
             {
-                start_angle_index = i;   
+                if (!leg_detection_going_on)
+                {
+                    start_angle_index = i;   
+                }
+                
+                end_angle_index = i;
+                leg_detection_going_on = true;
             }
-            
-            end_angle_index = i;
-            leg_detection_going_on = true;
+            else
+            {
+                if (leg_detection_going_on)
+                {
+                    number_table_legs_detected += 1;
+                    leg_1_index = int((start_angle_index + end_angle_index)/2);
+                    table_legs_indexes.push_back(leg_1_index);
+                }
+                leg_detection_going_on = false;
+                start_angle_index = 0;
+                end_angle_index = 0;
+            }
         }
-        else
+
+        // Check if the last leg was still being detected when the loop ended
+        if (leg_detection_going_on)
         {
-            if (leg_detection_going_on)
-            {
-                number_table_legs_detected += 1;
-                leg_1_index = int((start_angle_index + end_angle_index)/2);
-                table_legs_indexes.push_back(leg_1_index);
-            }
-            leg_detection_going_on = false;
-            start_angle_index = 0;
-            end_angle_index = 0;
+            number_table_legs_detected += 1;
+            leg_1_index = int((start_angle_index + end_angle_index)/2);
+            table_legs_indexes.push_back(leg_1_index);
+        }
+
+        //print the number of table legs detected
+        RCLCPP_INFO(this->get_logger(), "number of table legs detected: %d", number_table_legs_detected);
+
+
+        if (number_table_legs_detected == 2)
+        {
+            middle_point_table_legs(table_legs_indexes);
         }
     }
 
-    // Check if the last leg was still being detected when the loop ended
-    if (leg_detection_going_on)
+
+
+    void middle_point_table_legs(std::vector<int> table_legs_indexes)
     {
-        number_table_legs_detected += 1;
-        leg_1_index = int((start_angle_index + end_angle_index)/2);
-        table_legs_indexes.push_back(leg_1_index);
+        float leg_1_x, leg_1_y, leg_2_x, leg_2_y;
+
+        //find the angle of the table legs
+        leg_1_x = calculate_coordinate(x_coordinate, table_legs_indexes[0]);
+        leg_1_y = calculate_coordinate(y_coordinate, table_legs_indexes[0]);
+        leg_2_x = calculate_coordinate(x_coordinate, table_legs_indexes[1]);
+        leg_2_y = calculate_coordinate(y_coordinate, table_legs_indexes[1]);
+
+        mid_point_x = (leg_1_x + leg_2_x)/2;
+        mid_point_y = (leg_1_y + leg_2_y)/2;
+        RCLCPP_INFO(this->get_logger(), "mid point x: %f", mid_point_x);
+        RCLCPP_INFO(this->get_logger(), "mid point y: %f", mid_point_y);
     }
 
-    //print the number of table legs detected
-    RCLCPP_INFO(this->get_logger(), "number of table legs detected: %d", number_table_legs_detected);
 
-    //print the indexes of the table legs
-    for (size_t i = 0; i < table_legs_indexes.size(); i++)
+    //calculate x and y oordinates
+    float calculate_coordinate(std::string coordinate, int index)
     {
-        RCLCPP_INFO(this->get_logger(), "table leg index- %ld: %d",i, table_legs_indexes[i]);
+        float coordinate_value;
+        if (coordinate == "x")
+        {
+            coordinate_value = scan_msg_ -> ranges[index] * cos(scan_msg_ -> angle_min + index * scan_msg_ -> angle_increment);
+        }
+        else if (coordinate == "y")
+        {
+            coordinate_value = scan_msg_ -> ranges[index] * sin(scan_msg_ -> angle_min + index *scan_msg_ -> angle_increment);
+        }
+        return coordinate_value;
     }
-}
+
+
 
 
     //variables defined
@@ -92,6 +128,10 @@ void detect_table_legs()
     int intensity_threshold = 8000;
     int leg_1_index, leg_2_index;
     int number_table_legs_detected;
+    float mid_point_x, mid_point_y;
+    std::string x_coordinate = "x";
+    std::string y_coordinate = "y";
+
 };
 
 

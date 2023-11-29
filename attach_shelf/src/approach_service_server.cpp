@@ -1,3 +1,4 @@
+#include "geometry_msgs/msg/detail/twist__struct.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "attach_shelf/srv/go_to_loading.hpp"
 #include "geometry_msgs/msg/twist.hpp"
@@ -12,27 +13,79 @@ using std::placeholders::_1;
 using std::placeholders::_2;
 using MyCustomServiceMessage = attach_shelf::srv::GoToLoading;
 
-class AprroachServiceServer : public rclcpp::Node  // Ensure this class name is what you intended
+class ApproachServiceServer : public rclcpp::Node  // Ensure this class name is what you intended
 {
 public:
-    AprroachServiceServer() : Node("approach_service_server_node")  // Constructor definition corrected
+    ApproachServiceServer() : Node("approach_service_server_node")  // Constructor definition corrected
     {
 
         number_table_legs_detected = 0;
 
         //laser scan subscriber
         scan_subscriber_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-            "/scan", 10, std::bind(&AprroachServiceServer::scan_callback, this, _1));
+            "/scan", 10, std::bind(&ApproachServiceServer::scan_callback, this, _1));
 
         
         //tf broadcaster
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
+        vel_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("robot/cmd_vel", 10);
+
+        timer_ = this->create_wall_timer(50ms, std::bind(&ApproachServiceServer::timer_callback, this));
+
+        tf_buffer_ =  std::make_unique<tf2_ros::Buffer>(this->get_clock());
+        
+        tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
     }
 
 
 
 private:
+    void timer_callback()
+    {
+        if (tf_listener_status)
+        {
+            //get the transform between the cart and the robot
+            geometry_msgs::msg::TransformStamped transformStamped;
+            try
+            {
+                transformStamped = tf_buffer_->lookupTransform(base_frame, child_frame, tf2::TimePointZero);
+            }
+            catch (tf2::TransformException &ex)
+            {
+                RCLCPP_INFO(this->get_logger(), "tf listener failed ");
+                RCLCPP_WARN(this->get_logger(), "%s", ex.what());
+                return;
+            }
+
+            //get the distance between the cart and the robot
+            float error_distance = sqrt(pow(transformStamped.transform.translation.x, 2) + pow(transformStamped.transform.translation.y, 2));
+            float error_yaw= atan2(transformStamped.transform.translation.y, transformStamped.transform.translation.x);
+
+            //if the distance is greater than distance gap threshold, then move the robot or else stop the robot.
+            if (error_distance > distance_gap_threshold)
+            {
+                vel_msg_.linear.x = error_distance * translation_speed;
+                vel_msg_.angular.z = error_yaw * angular_speed;
+            }
+            else
+            {
+                vel_msg_.linear.x = 0;
+                vel_msg_.angular.z = 0;
+            }
+
+            vel_publisher_->publish(vel_msg_);
+        }
+        else
+        {
+            vel_msg_.linear.x = 0;
+            vel_msg_.angular.z = 0;
+            vel_publisher_->publish(vel_msg_);
+        }
+    }
+
+
+
     void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
         scan_msg_ = msg;
@@ -151,7 +204,7 @@ private:
         tf_broadcaster_->sendTransform(transformStamped);
         RCLCPP_INFO(this->get_logger(), "published the tf frame of the cart");
 
-        tf_listener_status = false;
+        tf_listener_status = true;
     }
 
 
@@ -160,7 +213,7 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_subscriber_;
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_publisher_;
     std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
-    std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
     rclcpp::TimerBase::SharedPtr timer_;   
 
@@ -173,6 +226,7 @@ private:
     float distance_gap_threshold = 0.1;
     std::string parent_frame = "robot_front_laser_base_link";
     std::string child_frame = "cart_frame";
+    std::string base_frame = "robot_base_link";
 
     bool attach_to_shelf_status; 
     int leg_1_index, leg_2_index;
@@ -194,7 +248,7 @@ private:
 int main(int argc, char* argv[])
 {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<AprroachServiceServer>());  // Ensure the class name matches
+    rclcpp::spin(std::make_shared<ApproachServiceServer>());  // Ensure the class name matches
     rclcpp::shutdown();
     return 0;
 }

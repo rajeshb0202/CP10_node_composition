@@ -15,9 +15,21 @@ def generate_launch_description():
         name= "approach_service_server_node",
     )
 
+    rviz_config_dir = os.path.join(pkg_path, 'rviz', 'cp9.rviz')
+
+    rviz_action = Node(
+        package="rviz2",
+        executable="rviz2",
+        output='screen',
+        name="rviz_node",
+        parameters=[{'use_sim_time': True}],
+        arguments=['-d', rviz_config_dir]
+    )
+
 
     return LaunchDescription(
         [
+            rviz_action,
             approach_server_node,
         ]
     )

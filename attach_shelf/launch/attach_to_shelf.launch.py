@@ -15,8 +15,8 @@ def generate_launch_description():
         name= "approach_service_server_node",
     )
 
-    obstacle_arg = DeclareLaunchArgument("obstacle", default_value="0.3")
-    degrees_arg = DeclareLaunchArgument("degrees", default_value="-90")
+    obstacle_arg = DeclareLaunchArgument("obstacle", default_value="0.0")
+    degrees_arg = DeclareLaunchArgument("degrees", default_value="0")
     final_approach_arg = DeclareLaunchArgument("final_approach", default_value="false")
 
     obstacle_ = LaunchConfiguration("obstacle")

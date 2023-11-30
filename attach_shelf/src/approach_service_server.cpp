@@ -248,7 +248,7 @@ private:
     sensor_msgs::msg::LaserScan::SharedPtr scan_msg_;
     geometry_msgs::msg::Twist vel_msg_;
 
-    float translation_speed = 0.4; 
+    float translation_speed = 0.5; 
     float angular_speed = 0.5;
     int intensity_threshold = 8000;
     float distance_gap_threshold = 0.06;

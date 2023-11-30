@@ -23,6 +23,8 @@ public:
         move_robot_status = false;
         publish_tf_cart_frame_status = false;
         tf_listener_status = false;
+        moved_near_the_cart_status = false;
+        moved_under_the_cart_status = false;
 
         //laser scan subscriber
         scan_subscriber_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
@@ -72,7 +74,7 @@ private:
 
     void timer_callback()
     {
-        if (move_robot_status && tf_listener_status)
+        if (move_robot_status && tf_listener_status && !moved_near_the_cart_status)
         {
             //get the transform between the cart and the robot
             geometry_msgs::msg::TransformStamped transformStamped;
@@ -101,6 +103,7 @@ private:
             {
                 vel_msg_.linear.x = 0;
                 vel_msg_.angular.z = 0;
+                moved_near_the_cart_status = true;
             }
 
             vel_publisher_->publish(vel_msg_);
@@ -111,6 +114,36 @@ private:
             vel_msg_.angular.z = 0;
             vel_publisher_->publish(vel_msg_);
         }
+
+        if (moved_near_the_cart_status && !moved_under_the_cart_status)
+        {
+            move_underneath_the_cart();
+        }
+
+    }
+
+    void move_underneath_the_cart()
+    {
+        //move for 30 cm underneath the cart
+        vel_msg_.linear.x = translation_speed/3;
+        vel_msg_.angular.z = 0;
+
+        float time_to_move = 3*distance_to_be_moved/translation_speed;
+        RCLCPP_INFO(this->get_logger(), "moving underneath the cart for %f seconds", time_to_move);
+        float current_time = this->now().seconds();
+        float end_time = current_time + time_to_move;
+
+        while (this->now().seconds() < end_time)
+        {
+            vel_publisher_->publish(vel_msg_);
+        }
+
+        //stop the robot at the end
+        vel_msg_.linear.x = 0;
+        vel_msg_.angular.z = 0;
+        vel_publisher_->publish(vel_msg_);
+        RCLCPP_INFO(this->get_logger(), "moved underneath the cart successfully");
+        moved_under_the_cart_status = true;
     }
 
 
@@ -248,10 +281,11 @@ private:
     sensor_msgs::msg::LaserScan::SharedPtr scan_msg_;
     geometry_msgs::msg::Twist vel_msg_;
 
-    float translation_speed = 0.5; 
+    float translation_speed = 0.4; 
     float angular_speed = 0.5;
     int intensity_threshold = 8000;
     float distance_gap_threshold = 0.06;
+    float distance_to_be_moved = 0.3;
     std::string parent_frame = "robot_front_laser_base_link";
     std::string child_frame = "cart_frame";
     std::string base_frame = "robot_base_link";
@@ -264,9 +298,11 @@ private:
     std::string y_coordinate = "y";
 
 
-    bool tf_listener_status;
-    bool move_robot_status; 
-    bool publish_tf_cart_frame_status;
+    bool tf_listener_status;            //whether to start the tf listener or not
+    bool move_robot_status;             //whether to move the robot or not
+    bool publish_tf_cart_frame_status;  //whether to publish the tf frame of the cart or not
+    bool moved_near_the_cart_status;    //whether the robot has moved near the cart or not
+    bool moved_under_the_cart_status;   //whether the robot has moved under the cart or not
 
 
 };

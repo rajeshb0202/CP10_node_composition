@@ -65,7 +65,7 @@ private:
             //if the distance is greater than distance gap threshold, then move the robot or else stop the robot.
             if (error_distance > distance_gap_threshold)
             {
-                vel_msg_.linear.x = error_distance * translation_speed;
+                vel_msg_.linear.x = translation_speed;
                 vel_msg_.angular.z = error_yaw * angular_speed;
             }
             else
@@ -161,8 +161,8 @@ private:
         mid_point_x = (leg_1_x + leg_2_x)/2;
         mid_point_y = (leg_1_y + leg_2_y)/2;
 
-        RCLCPP_INFO(this->get_logger(), "mid point x: %f", mid_point_x);
-        RCLCPP_INFO(this->get_logger(), "mid point y: %f", mid_point_y);
+        //RCLCPP_INFO(this->get_logger(), "mid point x: %f", mid_point_x);
+        //RCLCPP_INFO(this->get_logger(), "mid point y: %f", mid_point_y);
 
         //publishing the tf frame of the cart and the robot
         publish_tf_cart_frame();
@@ -202,7 +202,7 @@ private:
         transformStamped.transform.rotation.w = 1.0;
 
         tf_broadcaster_->sendTransform(transformStamped);
-        RCLCPP_INFO(this->get_logger(), "published the tf frame of the cart");
+        //RCLCPP_INFO(this->get_logger(), "published the tf frame of the cart");
 
         tf_listener_status = true;
     }
@@ -223,7 +223,7 @@ private:
     float translation_speed = 0.4; 
     float angular_speed = 0.5;
     int intensity_threshold = 8000;
-    float distance_gap_threshold = 0.1;
+    float distance_gap_threshold = 0.06;
     std::string parent_frame = "robot_front_laser_base_link";
     std::string child_frame = "cart_frame";
     std::string base_frame = "robot_base_link";

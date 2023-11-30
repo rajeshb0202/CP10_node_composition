@@ -20,30 +20,59 @@ public:
     {
 
         number_table_legs_detected = 0;
+        move_robot_status = false;
+        publish_tf_cart_frame_status = false;
+        tf_listener_status = false;
 
         //laser scan subscriber
         scan_subscriber_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
             "/scan", 10, std::bind(&ApproachServiceServer::scan_callback, this, _1));
-
         
         //tf broadcaster
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
         vel_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("robot/cmd_vel", 10);
-
         timer_ = this->create_wall_timer(50ms, std::bind(&ApproachServiceServer::timer_callback, this));
 
         tf_buffer_ =  std::make_unique<tf2_ros::Buffer>(this->get_clock());
-        
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
+        //Adding service to the server
+        service_ = this->create_service<MyCustomServiceMessage>("approach_service", std::bind(&ApproachServiceServer::service_callback, this, _1, _2));
     }
 
 
 
 private:
+    void service_callback(const std::shared_ptr<MyCustomServiceMessage::Request> request,  const std::shared_ptr<MyCustomServiceMessage::Response> response)
+    {
+        if (number_table_legs_detected == 2)
+        {
+            if (request->attach_to_shelf)
+            {
+                publish_tf_cart_frame_status = true;
+                move_robot_status = true;
+                RCLCPP_INFO(this->get_logger(), "moving status: True");
+                response->complete = true;
+            }
+            else if (!request->attach_to_shelf)
+            {
+                publish_tf_cart_frame_status = true;
+                move_robot_status = false;
+                RCLCPP_INFO(this->get_logger(), "moving status: False");
+            }
+        }
+        else if(number_table_legs_detected < 2)
+        {
+            response->complete = false;
+        }
+    }
+
+
+
     void timer_callback()
     {
-        if (tf_listener_status)
+        if (move_robot_status && tf_listener_status)
         {
             //get the transform between the cart and the robot
             geometry_msgs::msg::TransformStamped transformStamped;
@@ -93,8 +122,6 @@ private:
     }
 
 
-
-
     void detect_table_legs()
     {
         std::vector<int> table_legs_indexes;
@@ -140,7 +167,7 @@ private:
         RCLCPP_INFO(this->get_logger(), "number of table legs detected: %d", number_table_legs_detected);
 
         //if there are 2 legs detected, then find the middle point and publish the tf frame
-        if (number_table_legs_detected == 2)
+        if (number_table_legs_detected == 2 && publish_tf_cart_frame_status)
         {
             middle_point_table_legs(table_legs_indexes);
         }
@@ -216,6 +243,7 @@ private:
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
     rclcpp::TimerBase::SharedPtr timer_;   
+    rclcpp::Service<MyCustomServiceMessage>::SharedPtr service_;
 
     sensor_msgs::msg::LaserScan::SharedPtr scan_msg_;
     geometry_msgs::msg::Twist vel_msg_;
@@ -228,15 +256,17 @@ private:
     std::string child_frame = "cart_frame";
     std::string base_frame = "robot_base_link";
 
-    bool attach_to_shelf_status; 
+    
     int leg_1_index, leg_2_index;
     int number_table_legs_detected;
     float mid_point_x, mid_point_y;
     std::string x_coordinate = "x";
     std::string y_coordinate = "y";
 
-    //temporary variables
-    bool tf_listener_status = false;
+
+    bool tf_listener_status;
+    bool move_robot_status; 
+    bool publish_tf_cart_frame_status;
 
 
 };

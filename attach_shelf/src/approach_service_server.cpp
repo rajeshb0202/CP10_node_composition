@@ -163,8 +163,8 @@ private:
             table_legs_indexes.push_back(leg_1_index);
         }
 
-        //print the number of table legs detected
-        RCLCPP_INFO(this->get_logger(), "number of table legs detected: %d", number_table_legs_detected);
+        //print the number of table legs detected- debugging
+        //RCLCPP_INFO(this->get_logger(), "number of table legs detected: %d", number_table_legs_detected);
 
         //if there are 2 legs detected, then find the middle point and publish the tf frame
         if (number_table_legs_detected == 2 && publish_tf_cart_frame_status)

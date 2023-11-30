@@ -49,7 +49,7 @@ def generate_launch_description():
         degrees_arg,
         final_approach_arg,
         rviz_action,
-        #approach_server_action,
+        approach_server_action,
         pre_approach_v2_action,
         
     ])

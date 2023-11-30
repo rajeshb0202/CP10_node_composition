@@ -40,6 +40,7 @@ class PreApproach : public rclcpp::Node
             getting_params();
             dest_reached = false;
             rotate_status = false;
+            called_server = false;
 
             //callback groups
             odom_callback_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -57,6 +58,9 @@ class PreApproach : public rclcpp::Node
             publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/robot/cmd_vel", 10);
             scan_subscription_ = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10, std::bind(&PreApproach::scan_callback, this, _1), odom_options);
             odom_subscription_ = this->create_subscription<nav_msgs::msg::Odometry>("/odom", 10, std::bind(&PreApproach::odom_callback, this, _1), scan_options);
+
+            //service client
+            service_client_ = this->create_client<MyCustomServiceMessage>("/approach_service");
            
             RCLCPP_INFO(this->get_logger(), "pre_approach node has started!...");
         }
@@ -107,10 +111,13 @@ class PreApproach : public rclcpp::Node
             {
                 rotate_robot();
             }
+
+            //calling the service after the roobt has rotated
+            if (rotate_status && dest_reached && !called_server)
+            {
+                call_server();
+            }
         }
-
-
-
 
         void rotate_robot()
         {
@@ -149,12 +156,38 @@ class PreApproach : public rclcpp::Node
             RCLCPP_INFO(this->get_logger(), "Rotation of %0.2f degrees successfully done...", (angle_to_be_rotated_parameter * 180/M_PI));
         }
 
+        //method to call the service
+        void call_server()
+        {
+            auto request = std::make_shared<MyCustomServiceMessage::Request>();
+            request->attach_to_shelf = final_approach_parameter;
+
+            auto result_future = service_client_->async_send_request(request, std::bind(&PreApproach::service_response_callback, this, std::placeholders::_1));
+            called_server = true;
+        }
+
+        //callback function for service
+        void service_response_callback(rclcpp::Client<MyCustomServiceMessage>::SharedFuture future)
+        {
+            auto status = future.wait_for(1s);
+            if (status == std::future_status::ready) 
+            {
+                RCLCPP_INFO(this->get_logger(), "Service called successfully and its response: %s", future.get()->complete? "true" : "false");
+            } 
+            else 
+            {
+                RCLCPP_INFO(this->get_logger(), "Service In-Progress...");
+            }
+        }
+
+
 
 
     //defining variables
         rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_subscription_ ;
         rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscription_;
         rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_;
+        rclcpp::Client<MyCustomServiceMessage>::SharedPtr service_client_;
         
         geometry_msgs::msg::Twist vel_msg;
         //nav_msgs::msg::Odometry odom_msg;
@@ -170,6 +203,7 @@ class PreApproach : public rclcpp::Node
 
         bool dest_reached;
         bool rotate_status;
+        bool called_server;
         float angular_speed = 0.3;
         float translation_speed = 0.6;
         float current_yaw_angle;

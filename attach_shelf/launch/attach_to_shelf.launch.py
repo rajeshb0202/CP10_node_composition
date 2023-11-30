@@ -30,7 +30,7 @@ def generate_launch_description():
         name= "pre_approach_v2_node",
         parameters=[{"obstacle": obstacle_,
                     "degrees": degrees_ ,
-                    "final_approach", final_approach_}]
+                    "final_approach": final_approach_}]
     )
 
     rviz_config_dir = os.path.join(pkg_path, 'rviz', 'cp9.rviz')
@@ -48,7 +48,8 @@ def generate_launch_description():
         obstacle_arg,
         degrees_arg,
         final_approach_arg,
+        rviz_action,
         #approach_server_action,
         pre_approach_v2_action,
-        #rviz_action,
+        
     ])

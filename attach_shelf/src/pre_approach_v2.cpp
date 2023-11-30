@@ -16,50 +16,16 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <chrono>
 #include <memory>
-
 #include "attach_shelf/srv/go_to_loading.hpp"
 
 
-
-using MycustomServiceMsg = attach_shelf::srv::GoToLoading;
 using namespace std::chrono_literals;
 using std::placeholders::_1;
-
-bool dest_reached_status = false;
-bool rotate_status = false;
-
-
-class approach_shelf_client : public rclcpp::Node
-{
-    public:
-        approach_shelf_client() : Node ("approach_shelf_client_node")
-        {
-            this->declare_parameter("final_approach", "false");
-            this->getting_params();
-        }
+using std::placeholders::_2;
+using MyCustomServiceMessage = attach_shelf::srv::GoToLoading;
 
 
 
-
-    private:
-        void getting_params()
-        {
-            final_approach_parameter = this->get_parameter("final_approach").get_parameter_value().get<std::string>();
-            RCLCPP_INFO(this->get_logger(), "inside approach_shelf_client");
-        }
-
-    //variables
-    std::string final_approach_parameter;
-
-};
-
-
-
-
-
-
-
-//preapproach node
 class PreApproach : public rclcpp::Node
 {
     public:
@@ -68,11 +34,11 @@ class PreApproach : public rclcpp::Node
             //defining parameters
             this->declare_parameter("obstacle", 0.0);
             this->declare_parameter("degrees", 0);
-            
+            this->declare_parameter("final_approach", false);
 
             //intialising the variables
-            this->getting_params();
-            dest_reached_status = false;
+            getting_params();
+            dest_reached = false;
             rotate_status = false;
 
             //callback groups
@@ -100,6 +66,8 @@ class PreApproach : public rclcpp::Node
         {
             obstacle_distance_parameter = this->get_parameter("obstacle").get_parameter_value().get<float>();
             angle_to_be_rotated_parameter = (this->get_parameter("degrees").get_parameter_value().get<int>()) *  (M_PI / 180.0);
+            final_approach_parameter = this->get_parameter("final_approach").as_bool();      
+
         }
 
 
@@ -123,19 +91,19 @@ class PreApproach : public rclcpp::Node
             front_laser_reading = msg->ranges[front_laser_array_index];
 
     
-            if (front_laser_reading > obstacle_distance_parameter  && !dest_reached_status)
+            if (front_laser_reading > obstacle_distance_parameter  && !dest_reached)
             {
                vel_msg.linear.x = translation_speed;
             }
             else
             {
                 vel_msg.linear.x = 0.0;
-                dest_reached_status = true;
+                dest_reached = true;
             }
             
             publisher_->publish(vel_msg);
 
-            if (dest_reached_status && !rotate_status)
+            if (dest_reached && !rotate_status)
             {
                 rotate_robot();
             }
@@ -196,15 +164,16 @@ class PreApproach : public rclcpp::Node
 
         int front_laser_array_index;
         float front_laser_reading;
-        float current_yaw_angle;
-       
-        float angular_speed = 0.3;
-        float translation_speed = 0.6;
-        float yaw_threshold= 0.02;
-
         float obstacle_distance_parameter;
         float angle_to_be_rotated_parameter;
+        bool final_approach_parameter;
 
+        bool dest_reached;
+        bool rotate_status;
+        float angular_speed = 0.3;
+        float translation_speed = 0.6;
+        float current_yaw_angle;
+        float yaw_threshold= 0.02;
 };
 
 
@@ -214,11 +183,9 @@ int main (int argc, char *argv[])
 {
     rclcpp::init(argc, argv);
     auto pre_approach_node_obj = std::make_shared<PreApproach>();
-    auto approach_shelf_client_obj = std::make_shared<approach_shelf_client>();
 
     rclcpp::executors::MultiThreadedExecutor executor;
     executor.add_node(pre_approach_node_obj);
-    executor.add_node(approach_shelf_client_obj);
     executor.spin();
 
     rclcpp::shutdown();

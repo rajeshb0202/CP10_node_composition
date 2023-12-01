@@ -7,6 +7,8 @@
 #include "tf2_ros/transform_broadcaster.h"
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/buffer.h"
+#include "std_msgs/msg/empty.hpp"
+
 
 using namespace std::chrono_literals;
 using std::placeholders::_1;
@@ -44,6 +46,7 @@ public:
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
         vel_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("robot/cmd_vel", 10);
+        elevator_up_publisher_ = this->create_publisher<std_msgs::msg::Empty>("elevator_up", 10);
         timer_ = this->create_wall_timer(50ms, std::bind(&ApproachServiceServer::timer_callback, this), scan_callback_group_);
 
         tf_buffer_ =  std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -53,6 +56,8 @@ public:
         service_ = this->create_service<MyCustomServiceMessage>("approach_service", std::bind(&ApproachServiceServer::service_callback, this, _1, _2));    
 
         odom_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>("/odom", 10, std::bind(&ApproachServiceServer::odom_callback, this, _1), odom_subscription_options_);
+
+
     }
 
 
@@ -139,6 +144,11 @@ private:
             move_underneath_the_cart();
         }
 
+        if (moved_under_the_cart_status && !elevator_up_status)
+        {
+            elevator_up();
+        }
+
     }
 
     void move_underneath_the_cart()
@@ -167,6 +177,14 @@ private:
         }
         //stop the robot at the end        
         vel_publisher_->publish(vel_msg_);
+    }
+
+    void elevator_up()
+    {
+        std_msgs::msg::Empty up_msg;
+        elevator_up_publisher_->publish(up_msg);
+        elevator_up_status = true;
+        RCLCPP_INFO(this->get_logger(), "lifted the shelf up successfully");
     }
 
 
@@ -305,6 +323,7 @@ private:
     rclcpp::CallbackGroup::SharedPtr scan_callback_group_;
     rclcpp::SubscriptionOptions odom_subscription_options_;
     rclcpp::SubscriptionOptions scan_subscription_options_;
+    rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr elevator_up_publisher_;
 
     sensor_msgs::msg::LaserScan::SharedPtr scan_msg_;
     geometry_msgs::msg::Twist vel_msg_;
@@ -314,7 +333,7 @@ private:
     float angular_speed = 0.5;
     int intensity_threshold = 8000;
     float distance_gap_threshold = 0.06;
-    float distance_to_be_moved_underneath = 0.4;
+    float distance_to_be_moved_underneath = 0.35;
     std::string parent_frame = "robot_front_laser_base_link";
     std::string child_frame = "cart_frame";
     std::string base_frame = "robot_base_link";
@@ -335,6 +354,7 @@ private:
     bool moved_near_the_cart_status;    //whether the robot has moved near the cart or not
     bool moved_under_the_cart_status;   //whether the robot has moved under the cart or not
     bool first_time_moving_underneath_the_cart; //whether the robot has moved under the cart for the first time or not
+    bool elevator_up_status;            //whether the elevator has moved up or not
 
 
 };

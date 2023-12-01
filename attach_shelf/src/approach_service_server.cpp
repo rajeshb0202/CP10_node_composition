@@ -25,27 +25,46 @@ public:
         tf_listener_status = false;
         moved_near_the_cart_status = false;
         moved_under_the_cart_status = false;
+        first_time_moving_underneath_the_cart = true;
+
+        odom_callback_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+        scan_callback_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+        odom_subscription_options_ = rclcpp::SubscriptionOptions();
+        odom_subscription_options_.callback_group = odom_callback_group_;
+
+        scan_subscription_options_ = rclcpp::SubscriptionOptions();
+        scan_subscription_options_.callback_group = scan_callback_group_;
 
         //laser scan subscriber
         scan_subscriber_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-            "/scan", 10, std::bind(&ApproachServiceServer::scan_callback, this, _1));
+            "/scan", 10, std::bind(&ApproachServiceServer::scan_callback, this, _1), scan_subscription_options_);
         
         //tf broadcaster
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
         vel_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("robot/cmd_vel", 10);
-        timer_ = this->create_wall_timer(50ms, std::bind(&ApproachServiceServer::timer_callback, this));
+        timer_ = this->create_wall_timer(50ms, std::bind(&ApproachServiceServer::timer_callback, this), scan_callback_group_);
 
         tf_buffer_ =  std::make_unique<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
         //Adding service to the server
-        service_ = this->create_service<MyCustomServiceMessage>("approach_service", std::bind(&ApproachServiceServer::service_callback, this, _1, _2));
+        service_ = this->create_service<MyCustomServiceMessage>("approach_service", std::bind(&ApproachServiceServer::service_callback, this, _1, _2));    
+
+        odom_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>("/odom", 10, std::bind(&ApproachServiceServer::odom_callback, this, _1), odom_subscription_options_);
     }
 
 
 
 private:
+    void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
+    {
+        odom_msg_ = msg;
+        cuurent_x = odom_msg_->pose.pose.position.x;
+        cuurent_y = odom_msg_->pose.pose.position.y;
+    }
+
     void service_callback(const std::shared_ptr<MyCustomServiceMessage::Request> request,  const std::shared_ptr<MyCustomServiceMessage::Response> response)
     {
         if (number_table_legs_detected == 2)
@@ -124,26 +143,30 @@ private:
 
     void move_underneath_the_cart()
     {
-        //move for 30 cm underneath the cart
-        vel_msg_.linear.x = translation_speed/3;
-        vel_msg_.angular.z = 0;
-
-        float time_to_move = 3*distance_to_be_moved/translation_speed;
-        RCLCPP_INFO(this->get_logger(), "moving underneath the cart for %f seconds", time_to_move);
-        float current_time = this->now().seconds();
-        float end_time = current_time + time_to_move;
-
-        while (this->now().seconds() < end_time)
+        if (first_time_moving_underneath_the_cart)
         {
-            vel_publisher_->publish(vel_msg_);
+            start_x = cuurent_x;
+            start_y = cuurent_y;
+            first_time_moving_underneath_the_cart = false;
         }
+        
+        float distance_moved = sqrt(pow((cuurent_x - start_x), 2) + pow((cuurent_y - start_y), 2));
+        //RCLCPP_INFO(this->get_logger(), "distance moved: %f", distance_moved);
 
-        //stop the robot at the end
-        vel_msg_.linear.x = 0;
-        vel_msg_.angular.z = 0;
+        if (distance_moved < distance_to_be_moved_underneath)
+        {
+            vel_msg_.linear.x = translation_speed;
+            vel_msg_.angular.z = 0;
+        }
+        else
+        {
+            vel_msg_.linear.x = 0;
+            vel_msg_.angular.z = 0;
+            moved_under_the_cart_status = true;
+            RCLCPP_INFO(this->get_logger(), "moved underneath the cart successfully");
+        }
+        //stop the robot at the end        
         vel_publisher_->publish(vel_msg_);
-        RCLCPP_INFO(this->get_logger(), "moved underneath the cart successfully");
-        moved_under_the_cart_status = true;
     }
 
 
@@ -277,15 +300,21 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
     rclcpp::TimerBase::SharedPtr timer_;   
     rclcpp::Service<MyCustomServiceMessage>::SharedPtr service_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscriber_;
+    rclcpp::CallbackGroup::SharedPtr odom_callback_group_;
+    rclcpp::CallbackGroup::SharedPtr scan_callback_group_;
+    rclcpp::SubscriptionOptions odom_subscription_options_;
+    rclcpp::SubscriptionOptions scan_subscription_options_;
 
     sensor_msgs::msg::LaserScan::SharedPtr scan_msg_;
     geometry_msgs::msg::Twist vel_msg_;
+    nav_msgs::msg::Odometry::SharedPtr odom_msg_;
 
     float translation_speed = 0.4; 
     float angular_speed = 0.5;
     int intensity_threshold = 8000;
     float distance_gap_threshold = 0.06;
-    float distance_to_be_moved = 0.3;
+    float distance_to_be_moved_underneath = 0.4;
     std::string parent_frame = "robot_front_laser_base_link";
     std::string child_frame = "cart_frame";
     std::string base_frame = "robot_base_link";
@@ -294,6 +323,8 @@ private:
     int leg_1_index, leg_2_index;
     int number_table_legs_detected;
     float mid_point_x, mid_point_y;
+    float start_x, start_y;
+    float cuurent_x, cuurent_y;
     std::string x_coordinate = "x";
     std::string y_coordinate = "y";
 
@@ -303,6 +334,7 @@ private:
     bool publish_tf_cart_frame_status;  //whether to publish the tf frame of the cart or not
     bool moved_near_the_cart_status;    //whether the robot has moved near the cart or not
     bool moved_under_the_cart_status;   //whether the robot has moved under the cart or not
+    bool first_time_moving_underneath_the_cart; //whether the robot has moved under the cart for the first time or not
 
 
 };

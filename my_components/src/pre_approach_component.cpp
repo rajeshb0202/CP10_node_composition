@@ -30,22 +30,11 @@ class PreApproach : public rclcpp::Node
             rotate_status = false;
             rotation_start_status = false;
 
-            //callback groups
-            odom_callback_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-            scan_callback_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-
-            //creating subscriptions options
-            rclcpp::SubscriptionOptions odom_options;
-            odom_options.callback_group = odom_callback_group;
-
-            rclcpp::SubscriptionOptions scan_options;
-            scan_options.callback_group = scan_callback_group;
-
 
             //creating subscribers and publishers
             publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/diffbot_base_controller/cmd_vel_unstamped", 10);
-            scan_subscription_ = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10, std::bind(&PreApproach::scan_callback, this, _1), odom_options);
-            odom_subscription_ = this->create_subscription<nav_msgs::msg::Odometry>("/diffbot_base_controller/odom", 10, std::bind(&PreApproach::odom_callback, this, _1), scan_options);
+            scan_subscription_ = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10, std::bind(&PreApproach::scan_callback, this, _1));
+            odom_subscription_ = this->create_subscription<nav_msgs::msg::Odometry>("/diffbot_base_controller/odom", 10, std::bind(&PreApproach::odom_callback, this, _1));
            
             RCLCPP_INFO(this->get_logger(), "pre_approach node has started!...");
         }
@@ -120,19 +109,22 @@ class PreApproach : public rclcpp::Node
                 rotation_start_status = true;
             }
 
-            while (fabs(target_angle - current_yaw_angle) > yaw_threshold)
+            if (fabs(target_angle - current_yaw_angle) > yaw_threshold)
             {
                 publisher_->publish(vel_msg);
-                //RCLCPP_INFO(this->get_logger(), "target_angle: %.1f, current_angle: %.1f", target_angle, current_yaw_angle );
+                RCLCPP_INFO(this->get_logger(), "target_angle: %.1f, current_angle: %.1f", target_angle, current_yaw_angle );
                 loop_rate.sleep();
             }
 
-            //stopping the robot after rotation
-            vel_msg.linear.x = 0.0;
-            vel_msg.angular.z = 0;
-            publisher_->publish(vel_msg);
-            rotate_status = true;
-            RCLCPP_INFO(this->get_logger(), "Rotation of %0.2f degrees successfully done...", (angle_to_be_rotated_parameter ));
+            else
+            {
+                //stopping the robot after rotation
+                vel_msg.linear.x = 0.0;
+                vel_msg.angular.z = 0;
+                publisher_->publish(vel_msg);
+                rotate_status = true;
+                RCLCPP_INFO(this->get_logger(), "Rotation of %0.2f degrees successfully done...", angle_to_be_rotated_parameter);
+            }
         }
 
 
@@ -172,9 +164,7 @@ int main (int argc, char *argv[])
     rclcpp::init(argc, argv);
     auto pre_approach_node_obj = std::make_shared<PreApproach>();
 
-    rclcpp::executors::MultiThreadedExecutor executor;
-    executor.add_node(pre_approach_node_obj);
-    executor.spin();
+    rclcpp::spin(pre_approach_node_obj);
 
     rclcpp::shutdown();
     return 0;

@@ -1,0 +1,8 @@
+<launch>
+
+
+    <node pkg="my_components" exec="pre_approach_component_node" name="pre_approach_component">
+
+    </node>
+
+</launch>

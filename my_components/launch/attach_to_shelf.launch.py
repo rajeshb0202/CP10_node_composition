@@ -1,5 +1,6 @@
+
 import launch
-from launch_ros.actions import ComposableNodeContainer
+from launch_ros.actions import Node, ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 
 
@@ -15,9 +16,19 @@ def generate_launch_description():
                     package='my_components',
                     plugin='my_components::PreApproach',
                     name='pre_approach'),
-                
             ],
             output='screen',
     )
 
-    return launch.LaunchDescription([container])
+    manual_composition_node = Node(
+            package='my_components',
+            executable='manual_composition',
+            output='screen',
+            emulate_tty=True)
+
+
+
+    return launch.LaunchDescription([
+            manual_composition_node,
+            container, 
+    ])

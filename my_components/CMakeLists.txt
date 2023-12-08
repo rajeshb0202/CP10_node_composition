@@ -64,9 +64,21 @@ set(node_plugins "${node_plugins}my_components::AttachServer;$<TARGET_FILE:attac
 
 
 
+add_library(attach_client SHARED src/attach_client.cpp)
+target_compile_definitions(attach_client PRIVATE "COMPOSITION_BUILDING_DLL")
+ament_target_dependencies(attach_client
+  "rclcpp"
+  "rclcpp_components"
+  "attach_shelf")
+rclcpp_components_register_nodes(attach_client "my_components::AttachClient")
+set(node_plugins "${node_plugins}my_components::AttachClient;$<TARGET_FILE:attach_client>\n")
+
+
+
 install(TARGETS
   preapproach
   attach_server
+  attach_client
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)

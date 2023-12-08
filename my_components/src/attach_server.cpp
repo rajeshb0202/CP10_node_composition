@@ -55,7 +55,7 @@ namespace my_components
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
         //Adding service to the server
-        service_ = this->create_service<MyCustomServiceMessage>("approach_service", std::bind(&AttachServer::service_callback, this, _1, _2));    
+        service_ = this->create_service<MyCustomServiceMessage>("approach_shelf", std::bind(&AttachServer::service_callback, this, _1, _2));    
 
         odom_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>("/diffbot_base_controller/odom", 10, std::bind(&AttachServer::odom_callback, this, _1), odom_subscription_options_);
 

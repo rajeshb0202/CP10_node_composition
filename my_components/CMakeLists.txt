@@ -47,6 +47,7 @@ ament_target_dependencies(preapproach
 rclcpp_components_register_nodes(preapproach "my_components::PreApproach")
 set(node_plugins "${node_plugins}my_components::PreApproach;$<TARGET_FILE:preapproach>\n")
 
+
 add_library(attach_server SHARED src/attach_server.cpp)
 target_compile_definitions(attach_server PRIVATE "COMPOSITION_BUILDING_DLL")
 ament_target_dependencies(attach_server
@@ -70,7 +71,13 @@ install(TARGETS
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 
+add_executable(manual_composition  src/manual_composition.cpp)
+target_link_libraries(manual_composition attach_server )
+ament_target_dependencies(manual_composition  "rclcpp" "geometry_msgs" "attach_shelf" "nav_msgs"  "sensor_msgs" "tf2_ros")
 
+install(TARGETS
+  manual_composition
+  DESTINATION lib/${PROJECT_NAME})
 
 
 

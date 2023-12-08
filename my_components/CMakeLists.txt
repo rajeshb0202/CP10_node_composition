@@ -79,6 +79,14 @@ install(TARGETS
   manual_composition
   DESTINATION lib/${PROJECT_NAME})
 
+install(
+	DIRECTORY
+		launch
+		rviz
+	DESTINATION
+		share/${PROJECT_NAME}
+)
+
 
 
 ament_package()

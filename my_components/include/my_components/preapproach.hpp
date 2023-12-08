@@ -47,7 +47,7 @@ class PreApproach : public rclcpp::Node
 
         int front_laser_array_index;
         float front_laser_reading;
-        float obstacle_distance_parameter = 0.3;
+        float obstacle_distance_parameter = 0.45;
         float angle_to_be_rotated_parameter = -90.0;
         bool dest_reached;
         bool rotate_status;

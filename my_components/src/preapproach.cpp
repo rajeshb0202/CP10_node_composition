@@ -58,7 +58,8 @@ namespace my_components
     {
         front_laser_array_index= int((0 - msg->angle_min)/(msg->angle_increment));
         front_laser_reading = msg->ranges[front_laser_array_index];
-
+        //for debugging
+        //RCLCPP_INFO(this->get_logger(), "front lsr: %.2f", front_laser_reading);
 
         if (front_laser_reading > obstacle_distance_parameter  && !dest_reached)
         {

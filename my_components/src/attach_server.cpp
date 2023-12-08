@@ -162,7 +162,7 @@ namespace my_components
         }
         
         float distance_moved = sqrt(pow((cuurent_x - start_x), 2) + pow((cuurent_y - start_y), 2));
-        RCLCPP_INFO(this->get_logger(), "distance moved: %f", distance_moved);
+        //RCLCPP_INFO(this->get_logger(), "distance moved: %f", distance_moved);
 
         if (distance_moved < distance_to_be_moved_underneath)
         {

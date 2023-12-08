@@ -113,7 +113,7 @@ namespace my_components
             publisher_->publish(vel_msg);
             //for debugging, pritning the target angle and the current angle.
             //RCLCPP_INFO(this->get_logger(), "target_angle: %.1f, current_angle: %.1f", target_angle, current_yaw_angle );
-            loop_rate.sleep();
+            //loop_rate.sleep();
         }
 
         else

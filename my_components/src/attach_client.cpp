@@ -18,7 +18,7 @@ using MyCustomServiceMessage = attach_shelf::srv::GoToLoading;
 namespace my_components
 {
   
-        AttachClient::AttachClient(const rclcpp::NodeOptions & options):Node("pre_approach_node")
+        AttachClient::AttachClient(const rclcpp::NodeOptions & options):Node("attach_client_node")
         {
             //service client
             service_client_ = this->create_client<MyCustomServiceMessage>("/approach_shelf");

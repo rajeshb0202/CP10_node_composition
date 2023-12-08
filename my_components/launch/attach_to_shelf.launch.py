@@ -16,6 +16,10 @@ def generate_launch_description():
                     package='my_components',
                     plugin='my_components::PreApproach',
                     name='pre_approach'),
+                ComposableNode(
+                    package='my_components',
+                    plugin='my_components::AttachServer',
+                    name='attach_server'),
             ],
             output='screen',
     )
@@ -29,6 +33,5 @@ def generate_launch_description():
 
 
     return launch.LaunchDescription([
-            manual_composition_node,
             container, 
     ])
